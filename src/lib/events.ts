@@ -13,6 +13,15 @@ function createPublicEventsClient() {
     return null;
   }
 
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return null;
+    }
+  } catch {
+    return null;
+  }
+
   return createClient(url, key, {
     auth: {
       persistSession: false,
