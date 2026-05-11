@@ -11,6 +11,21 @@ import type {
 import { buildDuplicateMatches, classifyDuplicateScore } from "@/lib/dedupe";
 
 const rssParser = new Parser();
+const ARTICLE_FETCH_TIMEOUT_MS = 5000;
+const RSS_IMPORT_ITEM_LIMIT = 12;
+const EVENT_LINK_HOST_PATTERNS = [
+  "ticketmaster.",
+  "eventbrite.",
+  "showpass.",
+  "universe.com",
+  "bandsintown.com",
+  "ticketweb.",
+  "tixr.com",
+  "admitone.com",
+  "simpletix.",
+  "dice.fm",
+  "seetickets.",
+];
 
 function maybeIsoDate(value?: string | null) {
   if (!value) {
@@ -29,6 +44,72 @@ function inferCategory(text: string, fallback?: string | null) {
   const normalized = text.toLowerCase();
   const match = categories.find((category) => normalized.includes(category.toLowerCase().split(" / ")[0]));
   return match ?? "Community";
+}
+
+function looksLikeEventStory(text: string) {
+  const normalized = text.toLowerCase();
+  return [
+    "tour",
+    "concert",
+    "festival",
+    "tickets",
+    "live",
+    "show",
+    "event",
+    "performance",
+    "vancouver",
+  ].some((keyword) => normalized.includes(keyword));
+}
+
+function normalizePossiblyRedirectedUrl(value?: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const url = new URL(value);
+    const redirectTarget =
+      url.searchParams.get("u") ||
+      url.searchParams.get("url") ||
+      url.searchParams.get("redirect") ||
+      url.searchParams.get("destination") ||
+      url.searchParams.get("dest");
+
+    if (redirectTarget) {
+      return decodeURIComponent(redirectTarget);
+    }
+
+    return url.toString();
+  } catch {
+    return value;
+  }
+}
+
+function isLikelyEventLink(value?: string | null) {
+  const normalized = normalizePossiblyRedirectedUrl(value);
+  if (!normalized) {
+    return false;
+  }
+
+  try {
+    const url = new URL(normalized);
+    return EVENT_LINK_HOST_PATTERNS.some((pattern) => url.hostname.includes(pattern));
+  } catch {
+    return false;
+  }
+}
+
+function extractLikelyEventLinksFromHtml(html: string) {
+  const hrefs = [...html.matchAll(/href=["']([^"'#]+)["']/gi)]
+    .map((match) => normalizePossiblyRedirectedUrl(match[1]))
+    .filter((value): value is string => Boolean(value));
+
+  const textUrls = [...html.matchAll(/https?:\/\/[^\s"'<>]+/gi)]
+    .map((match) => normalizePossiblyRedirectedUrl(match[0]))
+    .filter((value): value is string => Boolean(value));
+
+  const candidates = [...new Set([...hrefs, ...textUrls])];
+  return candidates.filter((candidate) => isLikelyEventLink(candidate));
 }
 
 function toCandidateLike(candidate: ParsedImportCandidate): EventLike {
@@ -115,9 +196,29 @@ function parseJsonLdEventsFromHtml(html: string, source: EventSourceConfigRecord
   return events;
 }
 
-async function parseRssSource(source: EventSourceConfigRecord): Promise<ParsedImportCandidate[]> {
-  const feed = await rssParser.parseURL(source.base_url);
-  return (feed.items || []).map((item) => ({
+async function fetchHtml(url: string) {
+  const response = await fetch(url, {
+    signal: AbortSignal.timeout(ARTICLE_FETCH_TIMEOUT_MS),
+    headers: {
+      "user-agent":
+        "Mozilla/5.0 (compatible; LowerMainlandEventsBot/1.0; +https://lower-mainland-events.example/importer)",
+      "accept-language": "en-US,en;q=0.9",
+      accept: "text/html,application/xhtml+xml",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Source fetch failed with status ${response.status}`);
+  }
+
+  return response.text();
+}
+
+async function resolveRssItemToCandidates(
+  item: Parser.Item,
+  source: EventSourceConfigRecord,
+): Promise<ParsedImportCandidate[]> {
+  const baseCandidate: ParsedImportCandidate = {
     raw_title: item.title || "Untitled event",
     raw_description: item.contentSnippet || item.content || item.summary || "",
     raw_start_time: item.isoDate || item.pubDate || null,
@@ -133,27 +234,68 @@ async function parseRssSource(source: EventSourceConfigRecord): Promise<ParsedIm
     parsed_venue_name: null,
     parsed_city: source.city || "Other",
     parsed_category: inferCategory(`${item.title || ""} ${item.contentSnippet || item.content || ""}`, source.category_hint),
-    parsed_ticket_url: item.link || null,
+    parsed_ticket_url: null,
     parsed_poster_url: null,
     parsed_organizer_name: null,
     parsed_source_name: source.name,
     raw_payload: item as unknown as Record<string, unknown>,
-  }));
+  };
+
+  const articleUrl = item.link || source.base_url;
+
+  try {
+    const html = await fetchHtml(articleUrl);
+    const jsonLdCandidates = parseJsonLdEventsFromHtml(html, source).map((candidate) => ({
+      ...candidate,
+      raw_url: articleUrl,
+      parsed_ticket_url: normalizePossiblyRedirectedUrl(candidate.parsed_ticket_url) || extractLikelyEventLinksFromHtml(html)[0] || null,
+      parsed_poster_url: candidate.parsed_poster_url || baseCandidate.raw_image_url,
+      raw_payload: {
+        rss: item as unknown as Record<string, unknown>,
+        jsonLd: candidate.raw_payload,
+      },
+    }));
+
+    if (jsonLdCandidates.length) {
+      return jsonLdCandidates;
+    }
+
+    const eventLinks = extractLikelyEventLinksFromHtml(html);
+    if (eventLinks.length) {
+      return [
+        {
+          ...baseCandidate,
+          parsed_ticket_url: eventLinks[0],
+          parsed_poster_url: baseCandidate.raw_image_url,
+        },
+      ];
+    }
+  } catch (error) {
+    console.warn(`RSS article follow-up failed for ${articleUrl}:`, error);
+  }
+
+  if (!looksLikeEventStory(`${baseCandidate.raw_title} ${baseCandidate.raw_description || ""}`)) {
+    return [];
+  }
+
+  return [
+    {
+      ...baseCandidate,
+      parsed_ticket_url: null,
+      parsed_start_time: null,
+    },
+  ];
+}
+
+async function parseRssSource(source: EventSourceConfigRecord): Promise<ParsedImportCandidate[]> {
+  const feed = await rssParser.parseURL(source.base_url);
+  const items = (feed.items || []).slice(0, RSS_IMPORT_ITEM_LIMIT);
+  const resolved = await Promise.all(items.map((item) => resolveRssItemToCandidates(item, source)));
+  return resolved.flat();
 }
 
 async function parseHtmlOrManualSource(source: EventSourceConfigRecord): Promise<ParsedImportCandidate[]> {
-  const response = await fetch(source.base_url, {
-    signal: AbortSignal.timeout(8000),
-    headers: {
-      "user-agent": "LowerMainlandEventsBot/1.0 (+community event ingestion)",
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Source fetch failed with status ${response.status}`);
-  }
-
-  const html = await response.text();
+  const html = await fetchHtml(source.base_url);
   return parseJsonLdEventsFromHtml(html, source);
 }
 
