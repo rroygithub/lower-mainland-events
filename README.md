@@ -40,8 +40,8 @@ cp .env.example .env.local
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+SUPABASE_SECRET_KEY=
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ADMIN_EMAILS=admin@example.com
 ```
@@ -81,4 +81,4 @@ npm run dev
 ## Notes
 
 - When Supabase environment variables are missing, the app falls back to sample data so the UI remains explorable during development.
-- Admin APIs use the service role key server-side for moderation actions.
+- Admin APIs use the Supabase secret key server-side for moderation actions.
