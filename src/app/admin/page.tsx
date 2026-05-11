@@ -1,66 +1,45 @@
 import Link from "next/link";
 import { AdminAuthCard } from "@/components/admin-auth-card";
 import { Card, CardContent } from "@/components/ui/card";
-import { getDashboardSummary } from "@/lib/events";
-import { requireAdminUser } from "@/lib/auth";
+
+export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
-  const user = await requireAdminUser();
-
-  if (!user) {
-    return (
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
-        <AdminAuthCard />
-      </div>
-    );
-  }
-
-  const summary = await getDashboardSummary();
-
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14 space-y-8">
       <div className="space-y-3">
         <h1 className="font-[family-name:var(--font-display)] text-4xl text-slate-950">Admin dashboard</h1>
-        <p className="text-base text-slate-600">Review submissions, manage approved listings, and catch duplicates early.</p>
+        <p className="text-base text-slate-600">
+          Sign in with an allowlisted admin email to review submissions, manage sources, and moderate staged imports.
+        </p>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          ["Pending submissions", summary.pendingCount],
-          ["Approved events", summary.approvedCount],
-          ["Possible duplicates", summary.duplicateCount],
-          ["Rejected submissions", summary.rejectedCount],
-          ["Staged imports", summary.importCount],
-          ["Open reports", summary.reportCount],
-        ].map(([label, value]) => (
-          <Card key={label}>
-            <CardContent className="p-6">
-              <p className="text-sm text-slate-500">{label}</p>
-              <p className="mt-2 text-3xl font-semibold text-slate-950">{value}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-      <div className="grid gap-4 md:grid-cols-2">
-        <Link href="/admin/submissions" className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md">
-          <h2 className="text-lg font-semibold text-slate-900">Review submissions</h2>
-          <p className="mt-2 text-sm text-slate-600">Approve, reject, edit, and check duplicate suggestions.</p>
-        </Link>
-        <Link href="/admin/events" className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md">
-          <h2 className="text-lg font-semibold text-slate-900">Manage approved events</h2>
-          <p className="mt-2 text-sm text-slate-600">Audit published events and source quality.</p>
-        </Link>
-        <Link href="/admin/sources" className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md">
-          <h2 className="text-lg font-semibold text-slate-900">Manage sources</h2>
-          <p className="mt-2 text-sm text-slate-600">Add RSS feeds and public event pages for staged imports.</p>
-        </Link>
-        <Link href="/admin/imports" className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md">
-          <h2 className="text-lg font-semibold text-slate-900">Review imports</h2>
-          <p className="mt-2 text-sm text-slate-600">Approve, reject, or merge imported events without auto-publishing.</p>
-        </Link>
-        <Link href="/admin/reports" className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md">
-          <h2 className="text-lg font-semibold text-slate-900">Resolve reports</h2>
-          <p className="mt-2 text-sm text-slate-600">Work through incorrect info reports from the public event pages.</p>
-        </Link>
+      <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+        <AdminAuthCard />
+        <Card>
+          <CardContent className="space-y-4 p-6">
+            <h2 className="text-lg font-semibold text-slate-900">After you sign in</h2>
+            <div className="grid gap-3">
+              {[
+                ["Review submissions", "/admin/submissions"],
+                ["Manage approved events", "/admin/events"],
+                ["Manage sources", "/admin/sources"],
+                ["Review imports", "/admin/imports"],
+                ["Resolve reports", "/admin/reports"],
+              ].map(([label, href]) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-900 transition hover:bg-slate-50"
+                >
+                  {label}
+                </Link>
+              ))}
+            </div>
+            <p className="text-sm text-slate-500">
+              Admin API routes remain protected. This page is intentionally lightweight so it can load even if session lookup is not ready yet.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
