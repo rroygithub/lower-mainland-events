@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { CalendarDays, MapPin, Ticket } from "lucide-react";
 import { CategoryPill } from "@/components/category-pill";
+import { EventReportForm } from "@/components/event-report-form";
 import { ShareActions } from "@/components/share-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,15 +25,7 @@ export default async function EventDetailPage({
   }
 
   const eventUrl = absoluteUrl(`/events/${event.slug}`);
-  const calendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(
-    event.title,
-  )}&dates=${new Date(event.start_time).toISOString().replace(/[-:]|\.\d{3}/g, "")}/${new Date(
-    event.end_time || event.start_time,
-  )
-    .toISOString()
-    .replace(/[-:]|\.\d{3}/g, "")}&details=${encodeURIComponent(event.description || "")}&location=${encodeURIComponent(
-    `${event.venue_name || ""} ${event.venue_address || ""}`.trim(),
-  )}`;
+  const calendarUrl = absoluteUrl(`/api/events/${event.id}/calendar.ics`);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
@@ -104,6 +97,7 @@ export default async function EventDetailPage({
                   </Link>
                 ) : null}
               </div>
+              <EventReportForm eventId={event.id} />
             </CardContent>
           </Card>
         </div>

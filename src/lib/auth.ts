@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export function getAdminEmails() {
@@ -37,4 +38,14 @@ export async function requireAdminUser() {
   }
 
   return user;
+}
+
+export async function ensureAdminRouteAccess() {
+  const user = await requireAdminUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  return null;
 }

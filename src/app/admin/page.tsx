@@ -29,6 +29,8 @@ export default async function AdminPage() {
           ["Approved events", summary.approvedCount],
           ["Possible duplicates", summary.duplicateCount],
           ["Rejected submissions", summary.rejectedCount],
+          ["Staged imports", summary.importCount],
+          ["Open reports", summary.reportCount],
         ].map(([label, value]) => (
           <Card key={label}>
             <CardContent className="p-6">
@@ -46,6 +48,18 @@ export default async function AdminPage() {
         <Link href="/admin/events" className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md">
           <h2 className="text-lg font-semibold text-slate-900">Manage approved events</h2>
           <p className="mt-2 text-sm text-slate-600">Audit published events and source quality.</p>
+        </Link>
+        <Link href="/admin/sources" className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md">
+          <h2 className="text-lg font-semibold text-slate-900">Manage sources</h2>
+          <p className="mt-2 text-sm text-slate-600">Add RSS feeds and public event pages for staged imports.</p>
+        </Link>
+        <Link href="/admin/imports" className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md">
+          <h2 className="text-lg font-semibold text-slate-900">Review imports</h2>
+          <p className="mt-2 text-sm text-slate-600">Approve, reject, or merge imported events without auto-publishing.</p>
+        </Link>
+        <Link href="/admin/reports" className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md">
+          <h2 className="text-lg font-semibold text-slate-900">Resolve reports</h2>
+          <p className="mt-2 text-sm text-slate-600">Work through incorrect info reports from the public event pages.</p>
         </Link>
       </div>
     </div>

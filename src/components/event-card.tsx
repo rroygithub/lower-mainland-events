@@ -41,6 +41,9 @@ export function EventCard({ event }: { event: EventRecord }) {
             </div>
           </div>
           <p className="line-clamp-3 text-sm leading-6 text-slate-600">{event.description}</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+            Verified source: {event.source_name || "Community listing"}
+          </p>
           <div className="mt-auto flex items-center justify-between pt-2 text-sm font-medium text-slate-900">
             <span>View details</span>
             <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />

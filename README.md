@@ -18,6 +18,10 @@ A production-minded MVP for discovering Indian and South Asian community events 
 - `/events/[slug]` event detail pages with WhatsApp sharing, copy link, and add-to-calendar
 - `/submit` event submission form with duplicate checking
 - `/admin` dashboard with Supabase magic-link auth, moderation summary, and approval workflow
+- `/admin/sources` source management for manual, RSS, and HTML/JSON-LD imports
+- `/admin/imports` staged import review queue with approve, reject, and merge actions
+- `/admin/reports` issue reports moderation
+- Newsletter signup capture and ICS calendar downloads
 - Duplicate detection utility in [src/lib/dedupe.ts](/Users/rajeevroy/Downloads/Property%20Performance/lower-mainland-events/src/lib/dedupe.ts)
 - Seed script with sample approved events
 - Supabase schema in [supabase/schema.sql](/Users/rajeevroy/Downloads/Property%20Performance/lower-mainland-events/supabase/schema.sql)
@@ -62,6 +66,44 @@ npm run seed
 npm run dev
 ```
 
+## Phase 2 setup
+
+1. Re-run the latest SQL in [supabase/schema.sql](/Users/rajeevroy/Downloads/Property%20Performance/lower-mainland-events/supabase/schema.sql) so these tables exist:
+
+- `event_sources_config`
+- `event_imports`
+- `event_reports`
+- `newsletter_signups`
+
+2. Seed optional sample events if you want public listings immediately:
+
+```bash
+npm run seed
+```
+
+3. Add at least one source in `/admin/sources`.
+
+4. Run `Run import` for that source.
+
+5. Review staged rows in `/admin/imports`.
+
+## Import support
+
+- `rss`: parses feed items with `rss-parser`
+- `html` / `manual` / `eventbrite` / `other`: fetches the page and parses `application/ld+json` Event objects
+- Imported events always enter `event_imports` first and never auto-publish
+
+## Dedupe and quality
+
+- Duplicate scoring combines normalized URL matches, same-day timing, time proximity, title similarity, venue similarity, city, and organizer similarity.
+- Quality scoring checks title, description, start date, venue, city, URLs, poster, and category.
+- Imports below 60 quality are routed to `needs_review`.
+
+## Admin protection
+
+- Admin pages and mutation APIs require a signed-in Supabase user whose email appears in `ADMIN_EMAILS`.
+- No admin mutation route is intended to work anonymously.
+
 ## Admin workflow
 
 1. Visit `/admin`.
@@ -76,9 +118,10 @@ npm run dev
 2. Create a Vercel project from the repo.
 3. Add the environment variables in Vercel Project Settings.
 4. Redeploy after changing environment variables.
-5. Verify the homepage, event listing, event detail, submission form, and admin moderation flow.
+5. Verify the homepage, event listing, event detail, submission form, source import flow, admin moderation flow, and newsletter signup API.
 
 ## Notes
 
 - When Supabase environment variables are missing, the app falls back to sample data so the UI remains explorable during development.
 - Admin APIs use the Supabase secret key server-side for moderation actions.
+- Import routes are on-demand admin-triggered APIs, so they remain compatible with Vercel’s request lifecycle and avoid background workers.

@@ -1,32 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from "next/server";
-import { getAdminEmails, isAdminEmail } from "@/lib/auth";
+import { ensureAdminRouteAccess } from "@/lib/auth";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { EventSubmissionRecord } from "@/lib/types";
 import { slugify } from "@/lib/utils";
 
-async function ensureAdmin() {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !getAdminEmails().length) {
-    return true;
-  }
-
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) {
-    return false;
-  }
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  return isAdminEmail(user?.email);
-}
-
 export async function POST(request: Request) {
-  if (!(await ensureAdmin())) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const unauthorized = await ensureAdminRouteAccess();
+  if (unauthorized) return unauthorized;
 
   const admin = createSupabaseAdminClient() as ReturnType<typeof createSupabaseAdminClient> & {
     from: (table: string) => any;

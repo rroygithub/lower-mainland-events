@@ -14,9 +14,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, fallbackMode: true });
   }
 
-  const { submissionId } = (await request.json()) as { submissionId: string };
-
-  const { error } = await (admin.from("event_submissions") as any).update({ status: "rejected" }).eq("id", submissionId);
+  const { importId } = (await request.json()) as { importId: string };
+  const { error } = await (admin.from("event_imports") as any).update({ import_status: "rejected" }).eq("id", importId);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

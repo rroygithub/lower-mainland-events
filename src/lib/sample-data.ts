@@ -1,5 +1,12 @@
 import { addDays, setHours, setMinutes } from "date-fns";
-import type { EventRecord, EventSubmissionRecord } from "@/lib/types";
+import type {
+  EventImportRecord,
+  EventRecord,
+  EventReportRecord,
+  EventSourceConfigRecord,
+  EventSubmissionRecord,
+  NewsletterSignupRecord,
+} from "@/lib/types";
 import { demoEvents, posterFallbacks } from "@/lib/constants";
 
 const now = new Date();
@@ -254,6 +261,77 @@ export const sampleSubmissions: EventSubmissionRecord[] = [
     poster_url: posterFallbacks[2],
     status: "pending",
     possible_duplicate_event_id: null,
+    created_at: now.toISOString(),
+  },
+];
+
+export const sampleSources: EventSourceConfigRecord[] = [
+  {
+    id: "source-1",
+    name: "Community Bulletin Feed",
+    source_type: "rss",
+    base_url: "https://example.com/community-events.xml",
+    city: "Surrey",
+    category_hint: "Community",
+    community_hint: "Indian / South Asian",
+    active: true,
+    last_checked_at: now.toISOString(),
+    notes: "Sample fallback source configuration",
+    created_at: now.toISOString(),
+    updated_at: now.toISOString(),
+  },
+];
+
+export const sampleImports: EventImportRecord[] = [
+  {
+    id: "import-1",
+    source_config_id: "source-1",
+    raw_title: "Punjabi Poetry Evening",
+    raw_description: "A community evening of poetry, music, and tea.",
+    raw_start_time: setMinutes(setHours(addDays(now, 11), 19), 0).toISOString(),
+    raw_end_time: null,
+    raw_venue: "Surrey Arts House",
+    raw_city: "Surrey",
+    raw_url: "https://example.com/punjabi-poetry-evening",
+    raw_image_url: posterFallbacks[0],
+    parsed_title: "Punjabi Poetry Evening",
+    parsed_description: "A community evening of poetry, music, and tea with local writers and performers.",
+    parsed_start_time: setMinutes(setHours(addDays(now, 11), 19), 0).toISOString(),
+    parsed_end_time: null,
+    parsed_venue_name: "Surrey Arts House",
+    parsed_city: "Surrey",
+    parsed_category: "Community",
+    parsed_ticket_url: "https://example.com/punjabi-poetry-evening",
+    parsed_poster_url: posterFallbacks[0],
+    parsed_organizer_name: "Surrey Writers Circle",
+    parsed_source_name: "Community Bulletin Feed",
+    import_status: "new",
+    duplicate_score: 0,
+    quality_score: 80,
+    possible_duplicate_event_id: null,
+    raw_payload: { title: "Punjabi Poetry Evening" },
+    created_at: now.toISOString(),
+  },
+];
+
+export const sampleReports: EventReportRecord[] = [
+  {
+    id: "report-1",
+    event_id: sampleEvents[0]?.id || null,
+    reporter_email: "reader@example.com",
+    issue_type: "wrong_date",
+    message: "Organizer page shows a later start time.",
+    status: "new",
+    created_at: now.toISOString(),
+  },
+];
+
+export const sampleNewsletterSignups: NewsletterSignupRecord[] = [
+  {
+    id: "signup-1",
+    email: "community@example.com",
+    city: "Vancouver",
+    categories: ["Festival", "Community"],
     created_at: now.toISOString(),
   },
 ];

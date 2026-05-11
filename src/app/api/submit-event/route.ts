@@ -21,6 +21,7 @@ export async function POST(request: Request) {
     start_time: new Date(String(formData.get("start_time"))).toISOString(),
     ticket_url: String(formData.get("ticket_url") || ""),
     source_url: String(formData.get("source_url") || ""),
+    organizer_name: String(formData.get("organizer_name") || ""),
   };
 
   const admin = createSupabaseAdminClient() as ReturnType<typeof createSupabaseAdminClient> & {

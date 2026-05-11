@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "seed": "tsx scripts/seed-events.ts"
+    "seed": "tsx scripts/seed-events.ts",
+    "test": "node --import tsx --test src/lib/dedupe.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
@@ -18,6 +19,7 @@
     "next": "16.2.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "rss-parser": "^3.13.0",
     "tailwind-merge": "^3.6.0",
     "ws": "^8.20.0"
   },

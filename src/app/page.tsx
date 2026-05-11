@@ -3,12 +3,13 @@ import { ArrowRight, CalendarDays, MapPin, Sparkles } from "lucide-react";
 import { FeaturedEvents } from "@/components/featured-events";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { getFeaturedEvents, getUpcomingEventsByCity, getWeekendEvents } from "@/lib/events";
+import { getFeaturedEvents, getRecentlyAddedEvents, getUpcomingEventsByCity, getWeekendEvents } from "@/lib/events";
 
 export default async function HomePage() {
-  const [featuredEvents, weekendEvents, upcomingByCity] = await Promise.all([
+  const [featuredEvents, weekendEvents, recentlyAddedEvents, upcomingByCity] = await Promise.all([
     getFeaturedEvents(),
     getWeekendEvents(),
+    getRecentlyAddedEvents(),
     getUpcomingEventsByCity(),
   ]);
 
@@ -28,6 +29,9 @@ export default async function HomePage() {
               <p className="max-w-2xl text-lg leading-8 text-slate-600">
                 Find concerts, classical music, dance, festivals, food events, religious gatherings, and community
                 programs before they happen.
+              </p>
+              <p className="max-w-2xl text-sm leading-6 text-slate-500">
+                Listings are curated from organizer submissions, community sources, and public event pages.
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -75,6 +79,14 @@ export default async function HomePage() {
           title="Featured events"
           description="Handpicked highlights with strong local interest, polished presentation, and clear logistics."
           events={featuredEvents}
+        />
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <FeaturedEvents
+          title="Recently added"
+          description="Freshly reviewed listings that just landed in the guide."
+          events={recentlyAddedEvents}
         />
       </div>
 
