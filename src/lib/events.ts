@@ -1,12 +1,28 @@
+import { createClient } from "@supabase/supabase-js";
 import { endOfDay } from "date-fns";
 import { applyEventFilters } from "@/lib/filters";
 import { sampleEvents, sampleSubmissions } from "@/lib/sample-data";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { EventFilters, EventRecord, EventSubmissionRecord } from "@/lib/types";
 
+function createPublicEventsClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+  if (!url || !key) {
+    return null;
+  }
+
+  return createClient(url, key, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  });
+}
+
 export async function getApprovedEvents(filters: EventFilters = {}) {
-  const supabase = await createSupabaseServerClient();
+  const supabase = createPublicEventsClient();
 
   if (!supabase) {
     return applyEventFilters(
@@ -15,28 +31,44 @@ export async function getApprovedEvents(filters: EventFilters = {}) {
     );
   }
 
-  let query = supabase
-    .from("events")
-    .select("*")
-    .eq("status", "approved")
-    .gte("start_time", new Date().toISOString())
-    .order("start_time", { ascending: filters.sort !== "desc" });
+  try {
+    let query = supabase
+      .from("events")
+      .select("*")
+      .eq("status", "approved")
+      .gte("start_time", new Date().toISOString())
+      .order("start_time", { ascending: filters.sort !== "desc" });
 
-  if (filters.city && filters.city !== "all") {
-    query = query.eq("city", filters.city);
+    if (filters.city && filters.city !== "all") {
+      query = query.eq("city", filters.city);
+    }
+
+    if (filters.category && filters.category !== "all") {
+      query = query.eq("category", filters.category);
+    }
+
+    if (filters.price && filters.price !== "all") {
+      query = query.eq("price_type", filters.price);
+    }
+
+    const { data, error } = await query.limit(100);
+
+    if (error) {
+      console.error("Failed to fetch approved events from Supabase:", error.message);
+      return applyEventFilters(
+        sampleEvents.filter((event) => event.status === "approved"),
+        filters,
+      );
+    }
+
+    return applyEventFilters((data as EventRecord[] | null) ?? [], filters);
+  } catch (error) {
+    console.error("Unexpected approved-events fetch error:", error);
+    return applyEventFilters(
+      sampleEvents.filter((event) => event.status === "approved"),
+      filters,
+    );
   }
-
-  if (filters.category && filters.category !== "all") {
-    query = query.eq("category", filters.category);
-  }
-
-  if (filters.price && filters.price !== "all") {
-    query = query.eq("price_type", filters.price);
-  }
-
-  const { data } = await query.limit(100);
-
-  return applyEventFilters((data as EventRecord[] | null) ?? [], filters);
 }
 
 export async function getFeaturedEvents() {
@@ -65,14 +97,25 @@ export async function getUpcomingEventsByCity() {
 }
 
 export async function getEventBySlug(slug: string) {
-  const supabase = await createSupabaseServerClient();
+  const supabase = createPublicEventsClient();
 
   if (!supabase) {
     return sampleEvents.find((event) => event.slug === slug) ?? null;
   }
 
-  const { data } = await supabase.from("events").select("*").eq("slug", slug).single();
-  return (data as EventRecord | null) ?? null;
+  try {
+    const { data, error } = await supabase.from("events").select("*").eq("slug", slug).single();
+
+    if (error) {
+      console.error(`Failed to fetch event by slug "${slug}":`, error.message);
+      return sampleEvents.find((event) => event.slug === slug) ?? null;
+    }
+
+    return (data as EventRecord | null) ?? null;
+  } catch (error) {
+    console.error(`Unexpected event lookup error for slug "${slug}":`, error);
+    return sampleEvents.find((event) => event.slug === slug) ?? null;
+  }
 }
 
 export async function getAllEventsForAdmin() {
