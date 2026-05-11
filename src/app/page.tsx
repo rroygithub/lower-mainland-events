@@ -1,65 +1,140 @@
-import Image from "next/image";
+import Link from "next/link";
+import { ArrowRight, CalendarDays, MapPin, Sparkles } from "lucide-react";
+import { FeaturedEvents } from "@/components/featured-events";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { getFeaturedEvents, getUpcomingEventsByCity, getWeekendEvents } from "@/lib/events";
 
-export default function Home() {
+export default async function HomePage() {
+  const [featuredEvents, weekendEvents, upcomingByCity] = await Promise.all([
+    getFeaturedEvents(),
+    getWeekendEvents(),
+    getUpcomingEventsByCity(),
+  ]);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="space-y-16 pb-16">
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-10 sm:pt-16">
+        <div className="grid gap-10 lg:grid-cols-[1.25fr_0.9fr] lg:items-end">
+          <div className="space-y-6">
+            <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-4 py-2 text-sm font-medium text-orange-800">
+              <Sparkles className="h-4 w-4" />
+              Local discovery for Metro Vancouver’s South Asian community
+            </div>
+            <div className="space-y-4">
+              <h1 className="max-w-3xl font-[family-name:var(--font-display)] text-5xl leading-tight text-slate-950 sm:text-6xl">
+                Discover Indian and South Asian events across Metro Vancouver.
+              </h1>
+              <p className="max-w-2xl text-lg leading-8 text-slate-600">
+                Find concerts, classical music, dance, festivals, food events, religious gatherings, and community
+                programs before they happen.
+              </p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Link href="/events">
+                <Button size="lg">Browse Events</Button>
+              </Link>
+              <Link href="/submit">
+                <Button variant="secondary" size="lg">
+                  Submit an Event
+                </Button>
+              </Link>
+            </div>
+          </div>
+
+          <Card className="overflow-hidden">
+            <CardContent className="space-y-5 p-6">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-slate-500">Quick discovery</p>
+                <CalendarDays className="h-5 w-5 text-slate-400" />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {[
+                  { label: "This weekend", href: "/events?date=this-weekend" },
+                  { label: "Free events", href: "/events?price=free" },
+                  { label: "Family-friendly", href: "/events?category=Kids%20%2F%20Family" },
+                  { label: "In Surrey", href: "/events?city=Surrey" },
+                ].map((item) => (
+                  <Link
+                    key={item.label}
+                    href={item.href}
+                    className="rounded-2xl border border-slate-200 p-4 transition hover:border-slate-950 hover:bg-slate-50"
+                  >
+                    <p className="text-base font-medium text-slate-900">{item.label}</p>
+                    <p className="mt-1 text-sm text-slate-500">Open curated listings</p>
+                  </Link>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </section>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <FeaturedEvents
+          title="Featured events"
+          description="Handpicked highlights with strong local interest, polished presentation, and clear logistics."
+          events={featuredEvents}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <FeaturedEvents
+          title="This weekend"
+          description="A fast view of what is happening next, optimized for last-minute plans and easy sharing."
+          events={weekendEvents}
+        />
+      </div>
+
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+        <div className="space-y-2">
+          <h2 className="text-2xl font-semibold text-slate-900 sm:text-3xl">Upcoming by city</h2>
+          <p className="text-sm leading-6 text-slate-600">Browse upcoming events grouped around the communities they serve.</p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <div className="grid gap-6 lg:grid-cols-2">
+          {upcomingByCity.map(([city, events]) => (
+            <Card key={city}>
+              <CardContent className="space-y-4 p-6">
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-slate-400" />
+                  <h3 className="text-lg font-semibold text-slate-900">{city}</h3>
+                </div>
+                <div className="space-y-3">
+                  {events.map((event) => (
+                    <Link
+                      key={event.id}
+                      href={`/events/${event.slug}`}
+                      className="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-3 transition hover:bg-slate-50"
+                    >
+                      <div>
+                        <p className="font-medium text-slate-900">{event.title}</p>
+                        <p className="text-sm text-slate-500">{event.venue_name || "Venue TBD"}</p>
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-slate-400" />
+                    </Link>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
-      </main>
+      </section>
+
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <Card className="bg-slate-950 text-white">
+          <CardContent className="flex flex-col gap-6 p-8 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-2xl font-semibold">Hosting something the community should know about?</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+                Submit your event for review and help people discover it before the date arrives.
+              </p>
+            </div>
+            <Link href="/submit">
+              <Button variant="secondary">Submit event</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </section>
     </div>
   );
 }
