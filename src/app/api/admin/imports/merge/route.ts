@@ -21,15 +21,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Import not found." }, { status: 404 });
   }
 
-  await (admin.from("event_sources") as any).insert({
+  const { error: sourceError } = await (admin.from("event_sources") as any).insert({
     event_id: eventId,
     source_name: item.parsed_source_name || "Imported source",
     source_url: item.raw_url || item.parsed_ticket_url || "",
   });
 
-  await (admin.from("event_imports") as any)
+  if (sourceError) {
+    return NextResponse.json({ error: sourceError.message }, { status: 500 });
+  }
+
+  const { error: importError } = await (admin.from("event_imports") as any)
     .update({ import_status: "approved", possible_duplicate_event_id: eventId })
     .eq("id", importId);
+
+  if (importError) {
+    return NextResponse.json({ error: importError.message }, { status: 500 });
+  }
 
   return NextResponse.json({ success: true });
 }

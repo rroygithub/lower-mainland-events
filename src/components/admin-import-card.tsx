@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,7 @@ export function AdminImportCard({
   item: EventImportRecord;
   possibleMatch: EventRecord | null;
 }) {
+  const router = useRouter();
   const [status, setStatus] = useState("");
   const [draft, setDraft] = useState({
     title: item.parsed_title || item.raw_title,
@@ -46,7 +48,13 @@ export function AdminImportCard({
       }),
     });
     const data = await response.json().catch(() => ({}));
-    setStatus(response.ok ? "Approved." : data.error || "Approval failed.");
+    if (response.ok) {
+      setStatus("Approved.");
+      router.refresh();
+      return;
+    }
+
+    setStatus(data.error || "Approval failed.");
   }
 
   async function reject() {
@@ -55,7 +63,15 @@ export function AdminImportCard({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ importId: item.id }),
     });
-    setStatus(response.ok ? "Rejected." : "Rejection failed.");
+    const data = await response.json().catch(() => ({}));
+
+    if (response.ok) {
+      setStatus("Rejected.");
+      router.refresh();
+      return;
+    }
+
+    setStatus(data.error || "Rejection failed.");
   }
 
   async function merge() {
@@ -69,7 +85,15 @@ export function AdminImportCard({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ importId: item.id, eventId: possibleMatch.id }),
     });
-    setStatus(response.ok ? "Merged into existing event." : "Merge failed.");
+    const data = await response.json().catch(() => ({}));
+
+    if (response.ok) {
+      setStatus("Merged into existing event.");
+      router.refresh();
+      return;
+    }
+
+    setStatus(data.error || "Merge failed.");
   }
 
   return (
