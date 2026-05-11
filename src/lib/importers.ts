@@ -13,6 +13,8 @@ import { buildDuplicateMatches, classifyDuplicateScore } from "@/lib/dedupe";
 const rssParser = new Parser();
 const ARTICLE_FETCH_TIMEOUT_MS = 5000;
 const RSS_IMPORT_ITEM_LIMIT = 12;
+const SITE_CRAWL_MAX_PAGES = 18;
+const SITE_CRAWL_MAX_DEPTH = 2;
 const EVENT_LINK_HOST_PATTERNS = [
   "ticketmaster.",
   "eventbrite.",
@@ -61,6 +63,28 @@ function looksLikeEventStory(text: string) {
   ].some((keyword) => normalized.includes(keyword));
 }
 
+function isLikelyEventPath(value: string) {
+  const normalized = value.toLowerCase();
+  return [
+    "/event",
+    "/events",
+    "/festival",
+    "/program",
+    "/shows",
+    "/tickets",
+    "/lineup",
+    "/schedule",
+  ].some((segment) => normalized.includes(segment));
+}
+
+function absolutizeUrl(href: string, baseUrl: string) {
+  try {
+    return new URL(href, baseUrl).toString();
+  } catch {
+    return null;
+  }
+}
+
 function normalizePossiblyRedirectedUrl(value?: string | null) {
   if (!value) {
     return null;
@@ -80,6 +104,17 @@ function normalizePossiblyRedirectedUrl(value?: string | null) {
     }
 
     return url.toString();
+  } catch {
+    return value;
+  }
+}
+
+function normalizeCrawlUrl(value: string) {
+  try {
+    const url = new URL(value);
+    url.hash = "";
+    const pathname = url.pathname.replace(/\/+$/, "") || "/";
+    return `${url.origin}${pathname}${url.search}`;
   } catch {
     return value;
   }
@@ -110,6 +145,25 @@ function extractLikelyEventLinksFromHtml(html: string) {
 
   const candidates = [...new Set([...hrefs, ...textUrls])];
   return candidates.filter((candidate) => isLikelyEventLink(candidate));
+}
+
+function extractSameOriginLinksFromHtml(html: string, pageUrl: string, origin: string) {
+  const urls = [...html.matchAll(/href=["']([^"'#]+)["']/gi)]
+    .map((match) => absolutizeUrl(match[1], pageUrl))
+    .filter((value): value is string => Boolean(value))
+    .map((value) => normalizePossiblyRedirectedUrl(value))
+    .filter((value): value is string => Boolean(value))
+    .filter((value) => {
+      try {
+        const url = new URL(value);
+        return url.origin === origin;
+      } catch {
+        return false;
+      }
+    })
+    .filter((value) => !value.includes("/tag/") && !value.includes("/category/") && !value.includes("/author/"));
+
+  return [...new Set(urls.map((value) => normalizeCrawlUrl(value)))];
 }
 
 function toCandidateLike(candidate: ParsedImportCandidate): EventLike {
@@ -196,6 +250,22 @@ function parseJsonLdEventsFromHtml(html: string, source: EventSourceConfigRecord
   return events;
 }
 
+function dedupeCandidates(candidates: ParsedImportCandidate[]) {
+  const seen = new Set<string>();
+  return candidates.filter((candidate) => {
+    const key = normalizeCrawlUrl(
+      candidate.parsed_ticket_url || candidate.raw_url || `${candidate.parsed_title || candidate.raw_title}-${candidate.parsed_start_time || ""}`,
+    );
+
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
+
 async function fetchHtml(url: string) {
   const response = await fetch(url, {
     signal: AbortSignal.timeout(ARTICLE_FETCH_TIMEOUT_MS),
@@ -212,6 +282,86 @@ async function fetchHtml(url: string) {
   }
 
   return response.text();
+}
+
+async function crawlSiteForEventCandidates(source: EventSourceConfigRecord): Promise<ParsedImportCandidate[]> {
+  let origin = "";
+
+  try {
+    origin = new URL(source.base_url).origin;
+  } catch {
+    return [];
+  }
+
+  const queue: Array<{ url: string; depth: number }> = [{ url: normalizeCrawlUrl(source.base_url), depth: 0 }];
+  const visited = new Set<string>();
+  const collected: ParsedImportCandidate[] = [];
+
+  while (queue.length && visited.size < SITE_CRAWL_MAX_PAGES) {
+    const current = queue.shift();
+    if (!current) break;
+    if (visited.has(current.url)) continue;
+    visited.add(current.url);
+
+    try {
+      const html = await fetchHtml(current.url);
+      const jsonLdCandidates = parseJsonLdEventsFromHtml(html, {
+        ...source,
+        base_url: current.url,
+      }).map((candidate) => ({
+        ...candidate,
+        raw_url: current.url,
+      }));
+
+      if (jsonLdCandidates.length) {
+        collected.push(...jsonLdCandidates);
+      }
+
+      const eventLinks = extractLikelyEventLinksFromHtml(html);
+      if (!jsonLdCandidates.length && eventLinks.length && isLikelyEventPath(current.url)) {
+        collected.push({
+          raw_title: current.url.split("/").filter(Boolean).pop()?.replace(/-/g, " ") || "Imported event",
+          raw_description: null,
+          raw_start_time: null,
+          raw_end_time: null,
+          raw_venue: null,
+          raw_city: source.city,
+          raw_url: current.url,
+          raw_image_url: null,
+          parsed_title: current.url.split("/").filter(Boolean).pop()?.replace(/-/g, " ") || "Imported event",
+          parsed_description: null,
+          parsed_start_time: null,
+          parsed_end_time: null,
+          parsed_venue_name: null,
+          parsed_city: source.city || "Other",
+          parsed_category: source.category_hint || "Community",
+          parsed_ticket_url: eventLinks[0],
+          parsed_poster_url: null,
+          parsed_organizer_name: null,
+          parsed_source_name: source.name,
+          raw_payload: { crawledFrom: current.url, eventLinks },
+        });
+      }
+
+      if (current.depth < SITE_CRAWL_MAX_DEPTH) {
+        const nextLinks = extractSameOriginLinksFromHtml(html, current.url, origin)
+          .filter((link) => !visited.has(link))
+          .sort((left, right) => {
+            const leftScore = Number(isLikelyEventPath(left));
+            const rightScore = Number(isLikelyEventPath(right));
+            return rightScore - leftScore;
+          });
+
+        for (const link of nextLinks) {
+          queue.push({ url: link, depth: current.depth + 1 });
+        }
+      }
+    } catch (error) {
+      console.warn(`Site crawl fetch failed for ${current.url}:`, error);
+    }
+  }
+
+  return dedupeCandidates(collected);
 }
 
 async function resolveRssItemToCandidates(
@@ -295,8 +445,14 @@ async function parseRssSource(source: EventSourceConfigRecord): Promise<ParsedIm
 }
 
 async function parseHtmlOrManualSource(source: EventSourceConfigRecord): Promise<ParsedImportCandidate[]> {
-  const html = await fetchHtml(source.base_url);
-  return parseJsonLdEventsFromHtml(html, source);
+  const directHtml = await fetchHtml(source.base_url);
+  const directCandidates = parseJsonLdEventsFromHtml(directHtml, source);
+
+  if (directCandidates.length) {
+    return dedupeCandidates(directCandidates);
+  }
+
+  return crawlSiteForEventCandidates(source);
 }
 
 export async function fetchImportCandidatesForSource(source: EventSourceConfigRecord) {
